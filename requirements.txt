@@ -1,0 +1,7 @@
+# FP&A Metric Monitor - Python Dependencies
+
+# HTTP requests library
+requests>=2.31.0
+
+# Environment variable management (optional, for production)
+python-dotenv>=1.0.0
