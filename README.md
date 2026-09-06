@@ -2,18 +2,18 @@
 
 ## Financial Planning & Analysis Monitoring
 
-Automated FP&A metric monitoring with anomaly detection and insight notifications. Designed to help finance teams monitor key metrics like revenue, gross margin, burn rate, and cash flow.
+Automated FP&A metric monitoring with anomaly detection and insight notifications. Designed to help finance teams monitor key metrics such as revenue, gross margin, burn rate, and cash flow.
 
 ## Features
-- Finance metrics fetching from data sources
+- Finance metrics fetching from configurable data sources
 - Anomaly detection using configurable thresholds
-- AI-powered insight generation via OpenAI API
-- Flexible notifications (Console, Slack, Discord, custom webhooks)
+- AI-assisted insight generation through a server-side model integration
+- Flexible notifications (console, Slack, Discord, custom webhooks)
 
 ## Technology
-Python 3.8 with requests library for API calls. Built with OpenAI GPT-4 for intelligent insights.
+Python with the `requests` library for API integrations.
 
-## Statur
-Active development. Used for financial metric monitoring at Miele.
+## Status
+Active development as a generic FP&A monitoring reference project. Public examples and fixtures must remain synthetic and must not contain employer, client, or personal production data.
 
-*"Built by João Caldas | joaoccaldas@gmail.com"*
+Built by João Caldas.
