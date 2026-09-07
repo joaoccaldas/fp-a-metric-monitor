@@ -7,7 +7,10 @@ Automated FP&A metric aggregation, anomaly detection, and insight notification.
 import os
 import json
 import requests
-from datetime import datetime
+from datetime import datetime, timezone
+import math
+from pathlib import Path
+from urllib.parse import urlparse
 from typing import Dict, List, Any
 
 
@@ -19,10 +22,39 @@ class MetricMonitor:
         self.webhook_url = webhook_url or os.getenv('WEBHOOK_URL')
         
     def fetch_metrics(self) -> Dict[str, Any]:
-        """Fetch financial metrics from mock data source."""
+        """Load a configured source, or explicitly opted-in synthetic demonstration."""
+        mode = os.getenv('METRICS_MODE', 'file')
+        if mode != 'demo':
+            if mode == 'file':
+                source = os.getenv('METRICS_FILE')
+                if not source:
+                    raise ValueError('METRICS_FILE is required; use METRICS_MODE=demo only for synthetic examples')
+                metrics = json.loads(Path(source).read_text(encoding='utf-8'))
+            elif mode == 'http':
+                source = os.getenv('METRICS_URL', '')
+                parsed = urlparse(source)
+                if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password:
+                    raise ValueError('METRICS_URL must be an HTTPS URL without embedded credentials')
+                headers = {'Accept': 'application/json'}
+                token = os.getenv('METRICS_TOKEN')
+                if token:
+                    headers['Authorization'] = f'Bearer {token}'
+                try:
+                    response = requests.get(source, headers=headers, timeout=20, allow_redirects=False)
+                    if response.status_code != 200:
+                        raise ValueError('Metrics source returned a non-success response')
+                    metrics = response.json()
+                except requests.RequestException:
+                    raise ValueError('Metrics source unavailable') from None
+            else:
+                raise ValueError('METRICS_MODE must be file, http or demo')
+            self.validate_metrics(metrics)
+            return {**metrics, 'data_mode': mode}
+        print('DEMO MODE: synthetic values, not business observations')
         # Mock data simulating real financial metrics
         metrics = {
-            'timestamp': datetime.now().isoformat(),
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+            'data_mode': 'synthetic_demo',
             'revenue': 1250000,
             'expenses': 875000,
             'gross_margin': 0.30,
@@ -35,6 +67,25 @@ class MetricMonitor:
         print(f"✓ Fetched metrics at {metrics['timestamp']}")
         return metrics
     
+    @staticmethod
+    def validate_metrics(metrics):
+        if not isinstance(metrics, dict):
+            raise ValueError('Metrics must be a JSON object')
+        required = ('revenue', 'expenses', 'gross_margin', 'burn_rate', 'accounts_receivable')
+        for key in required:
+            value = metrics.get(key)
+            if isinstance(value, bool) or not isinstance(value, (float, int)) or not math.isfinite(value):
+                raise ValueError(f'Missing or invalid numeric metric: {key}')
+        stamp = datetime.fromisoformat(str(metrics.get('timestamp', '')).replace('Z', '+00:00'))
+        if stamp.tzinfo is None:
+            raise ValueError('timestamp must contain a timezone')
+        age = (datetime.now(timezone.utc) - stamp).total_seconds()
+        max_age = float(os.getenv('METRICS_MAX_AGE_HOURS', '48'))
+        if not math.isfinite(max_age) or max_age <= 0:
+            raise ValueError('METRICS_MAX_AGE_HOURS must be finite and positive')
+        if age < -300 or age > max_age * 3600:
+            raise ValueError('Metrics timestamp is stale or in the future')
+
     def detect_anomalies(self, metrics: Dict[str, Any]) -> List[str]:
         """Detect anomalies in financial metrics."""
         anomalies = []
@@ -54,7 +105,7 @@ class MetricMonitor:
     
     def generate_insights(self, metrics: Dict[str, Any], anomalies: List[str]) -> str:
         """Generate insights using ChatGPT API."""
-        if not self.openai_api_key:
+        if not self.openai_api_key or os.getenv('ENABLE_AI_INSIGHTS') != '1':
             print("⚠ OpenAI API key not configured, using fallback insights")
             return self._fallback_insights(metrics, anomalies)
         
@@ -85,7 +136,7 @@ class MetricMonitor:
                 return self._fallback_insights(metrics, anomalies)
                 
         except Exception as e:
-            print(f"⚠ Error generating insights: {e}")
+            print("⚠ Insight provider unavailable; using deterministic summary")
             return self._fallback_insights(metrics, anomalies)
     
     def _build_prompt(self, metrics: Dict[str, Any], anomalies: List[str]) -> str:
@@ -133,19 +184,19 @@ Keep response concise (under 200 words)."""
             }
         }
         
-        if self.webhook_url:
+        if self.webhook_url and os.getenv('ENABLE_NOTIFICATIONS') == '1':
             try:
                 response = requests.post(
                     self.webhook_url,
                     json=notification,
                     timeout=10
                 )
-                if response.status_code == 200:
-                    print(f"✓ Notification sent to {self.webhook_url}")
+                if 200 <= response.status_code < 300:
+                    print("✓ Notification delivered")
                 else:
-                    print(f"⚠ Webhook returned {response.status_code}")
+                    raise RuntimeError(f"Notification rejected with status {response.status_code}")
             except Exception as e:
-                print(f"⚠ Failed to send webhook: {e}")
+                raise RuntimeError("Notification delivery failed") from None
         else:
             print("\n" + "="*60)
             print("NOTIFICATION (Console Output)")
