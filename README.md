@@ -17,3 +17,9 @@ Python with the `requests` library for API integrations.
 Active development as a generic FP&A monitoring reference project. Public examples and fixtures must remain synthetic and must not contain employer, client, or personal production data.
 
 Built by João Caldas.
+
+## Project context
+
+This is a personal, self-directed learning project by João Caldas. I use projects like this to learn software engineering, FP&A automation, AI-assisted development, and system design by building and testing concrete implementations.
+
+AI tools are used extensively during research, design, coding, debugging, testing, and documentation. AI-generated suggestions are treated as inputs to review, not proof of correctness. Finance logic should be validated with explicit assumptions, deterministic tests, and synthetic or appropriately licensed data.
